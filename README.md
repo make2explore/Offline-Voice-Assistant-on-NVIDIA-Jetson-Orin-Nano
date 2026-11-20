@@ -61,33 +61,31 @@ This project solves those challenges on the **NVIDIA Jetson Orin Nano (8GB)** by
 
 📕 **YouTube Video Links**  
 
-▶️  🔗  https://youtube.com/shorts/
+▶️ Jetson Orin Nano Super Developer Kit : Unboxing & Specs 🔗  https://youtu.be/QPcrAhREJjQ  
 
-▶️  🔗 https://youtu.be/ 
-  
-▶️  🔗 https://youtu.be/  
+▶️ Jetson Orin Nano Super Developer Kit Setup Guide (2026) 🔗  https://youtu.be/KXQEhidMDfc  
+
+▶️ Zero Cloud, Full Conversation: Offline AI Voice Assistant on Jetson Orin Nano  🔗  https://youtu.be/  
   
 
 -------------------------------------------------------------------------------------------------------
 📒 **Important Links**  
  
-📖 
+📖 Jetson Orin Nano Super Quick Start Guide :🔗 https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/quick_start.html  
   
-💾  
+💾 Jetson Developer Zone : 🔗 https://developer.nvidia.com/embedded-computing  
   
-📞  
+📞 Jetson Support Forums : 🔗 https://forums.developer.nvidia.com/c/robotics-edge-computing/jetson-systems/jetson-orin-nano/632  
+  
+🚨 NVIDIA Jetson Zoo Catalog : 🔗 https://elinux.org/Jetson_Zoo  
+  
+📌 Jetson Community Projects  :  🔗 https://developer.nvidia.com/embedded/community/jetson-projects  
   
 
 🛒  Purchase  -   
-  
-🟥 
+NVIDIA Official Website : 🔗 https://developer.nvidia.com/embedded/buy-jetson  
 
-🌐 
-
-  
-🚀 Projects - 
-  -  
-  -  
+Product page :  🔗 https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/nano-super-developer-kit/  
 
 
 ------------------------------------------------------------------------------------------------------
