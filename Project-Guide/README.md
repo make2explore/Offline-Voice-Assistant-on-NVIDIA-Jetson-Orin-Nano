@@ -120,8 +120,9 @@ This project solves those challenges on the **NVIDIA Jetson Orin Nano (8GB)** by
 ## Tutorial Guides & Videos
 
 * **Official NVIDIA Getting Started Guide:** [NVIDIA Jetson Orin Nano DevKit Documentation](https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit)
-* **Jetson Orin Nano Setup & Unboxing:** `[INSERT_YOUTUBE_VIDEO_LINK_HERE]`
-* **Complete Step-by-Step Project Walkthrough:** `[INSERT_VOICE_ASSISTANT_VIDEO_LINK_HERE]`
+* **Jetson Orin Nano Unboxing & Specs:** `[https://youtu.be/QPcrAhREJjQ]`  
+* **Jetson Orin Nano Super Developer Kit Setup Guide (2026):** `[https://youtu.be/KXQEhidMDfc]`  
+* **Complete Step-by-Step Project Walkthrough:** `[https://youtu.be/]`
 
 ---
 
