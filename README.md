@@ -12,7 +12,6 @@ This project solves those challenges on the **NVIDIA Jetson Orin Nano (8GB)** by
 * **Text-to-Speech (TTS):** Low-overhead, real-time neural voice generation using Piper TTS.
 * **Audio Layer:** Direct ALSA subsystem integration with universal hardware auto-detection.
 
----
 
 ## Key Features
 
