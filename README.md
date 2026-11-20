@@ -24,7 +24,6 @@ This project solves those challenges on the **NVIDIA Jetson Orin Nano (8GB)** by
 * **Universal Hardware Audio Resolver:** Scans ALSA interfaces at startup to automatically discover USB microphones, headsets, and webcams, eliminating hardcoded hardware indices.
 * **Optimized Thermal/Power Envelope:** Operates reliably under the Jetson 25W power profile, hovering around ~50°C under active load.
 
----
 
 ## Hardware Requirements
 
@@ -37,7 +36,6 @@ This project solves those challenges on the **NVIDIA Jetson Orin Nano (8GB)** by
 | **Speaker** | 3.5mm AUX Speaker, USB Audio Output, or Monitor Audio via DisplayPort/HDMI |
 | **Cooling** | Active PWM cooling fan |
 
----
 
 ## Software Requirements
 
@@ -49,7 +47,6 @@ This project solves those challenges on the **NVIDIA Jetson Orin Nano (8GB)** by
   * `faster-whisper`
   * Piper TTS (`en_US-lessac-medium`)
 
----
 
 ## Tutorial Guides & Videos
 
@@ -57,7 +54,6 @@ This project solves those challenges on the **NVIDIA Jetson Orin Nano (8GB)** by
 * **Jetson Orin Nano Setup & Unboxing:** `[INSERT_YOUTUBE_VIDEO_LINK_HERE]`
 * **Complete Step-by-Step Project Walkthrough:** `[INSERT_VOICE_ASSISTANT_VIDEO_LINK_HERE]`
 
----
 
 ------------------------------------------------------------------------------------------------------
 
