@@ -504,3 +504,48 @@ The script dynamically detects USB microphones and webcams upon launch. If you h
    ```bash
    # Example: forcing Card 1, Device 0
    MIC_DEV=plughw:1,0 python3 assistant.py
+   ```
+
+---
+
+## Thermal & Power Telemetry
+
+Monitor hardware statistics in real time using the Jetson diagnostic utility:
+
+```bash
+timeout 5 tegrastats
+```
+
+**Typical Profile Under Mode 1 (25W) Operation:**
+* **VDD_IN (System Power):** 4.5W – 6W during standby monitoring; brief peaks up to 14W–18W during active LLM inference.
+* **Temperatures:** CPU, GPU, and SoC rails remain balanced between 46°C and 54°C with active cooling.
+* **RAM Utilization:** Approximately 6.1 GB – 6.3 GB used (within the 7.48 GB available).
+
+---
+
+## Troubleshooting
+
+* **Ollama Connection Refused (`11434`):** Ensure the background service is loaded and running:
+  ```bash
+  sudo systemctl daemon-reload && sudo systemctl restart ollama
+  ```
+* **PyAV `metadata_errors` error:** Ensure `av<19` is installed in your virtual environment:
+  ```bash
+  pip install "av<19"
+  ```
+* **Over-current Throttling Popups:** If running under `2: MAXN SUPER`, desktop alerts warning of over-current are normal during concurrent peak STT/LLM execution. To eliminate the warning, switch to `1: 25W` mode:
+  ```bash
+  sudo nvpmodel -m 1
+  ```
+* **Wake word not detected:** Ensure microphone capture levels are sufficient. Open `alsamixer`, press `F6` to pick your USB sound device, press `F4` to view capture levels, and raise input gain.
+* **No audio playback:** Verify playback manually with `play /tmp/reply.wav` or check speaker routing in `alsamixer` under playback devices (`F3`).
+* **Piper command not found:** Ensure the symlink was created correctly:
+  ```bash
+  sudo ln -sf ~/voice-bot/piper/piper /usr/local/bin/piper
+  ```
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
