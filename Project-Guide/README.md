@@ -10,7 +10,7 @@ A fully local, low-latency, and privacy-preserving voice assistant running entir
 * [Hardware Requirements](#hardware-requirements)
 * [Software Requirements](#software-requirements)
 * [Step-by-Step Build Guide](#step-by-step-build-guide)
-  * [1. System Performance, Audio Dependencies & Permissions](#1-system-performance-audio-dependencies--permissions)
+  * [1. Audio Dependencies & User Permissions](#1-audio-dependencies--user-permissions)
   * [2. Local LLM Runtime (Ollama Setup, Service Override & Validation)](#2-local-llm-runtime-ollama-setup-service-override--validation)
   * [3. Python Environment & Faster-Whisper Setup](#3-python-environment--faster-whisper-setup)
   * [4. Piper Neural TTS Setup & Voice Models](#4-piper-neural-tts-setup--voice-models)
@@ -52,7 +52,7 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 
 ## System Architecture
 
-```
+```text
        +-----------------------+
        |   Ambient Listening   | <---+
        |    (3-second loop)    |     |
@@ -104,6 +104,8 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 | **Speaker** | 3.5mm AUX Speaker, USB Audio Out, or Monitor Audio via DisplayPort |
 | **Cooling** | Active PWM cooling fan |
 
+> **Note on Power Modes:** Prior to heavy testing or recording, switch your Jetson power profile to **MAXN / 25W** directly via the desktop GUI power mode drop-down menu in the top-right toolbar.
+
 ---
 
 ## Software Requirements
@@ -113,23 +115,19 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 * **System Utilities:** `alsa-utils`, `sox`, `libsox-fmt-all`, `curl`, `git`
 * **Local Inference Engines:**
   * Ollama (`llama3.2:3b`)
-  * `faster-whisper`
+  * `faster-whisper` (with `av<19`)
   * Piper TTS (`en_US-lessac-medium`)
 
 ---
 
 ## Step-by-Step Build Guide
 
-### 1. System Performance, Audio Dependencies & Permissions
+### 1. Audio Dependencies & User Permissions
 
-Maximize system performance via `nvpmodel`, install audio packages, and grant your user account access to ALSA audio devices:
+Install the necessary audio libraries and developer packages, then add your user to the `audio` group for direct ALSA device access:
 
 ```bash
-# 1. Set Jetson to 25W mode and lock clocks
-sudo nvpmodel -m 0
-sudo jetson_clocks
-
-# 2. Update package index and install required audio/system tools
+# 1. Update package index and install required audio/system tools
 sudo apt update && sudo apt install -y \
     alsa-utils \
     sox \
@@ -139,7 +137,7 @@ sudo apt update && sudo apt install -y \
     python3-pip \
     python3-venv
 
-# 3. Add your user to the audio group (ensures permission to capture/play audio)
+# 2. Add your user to the audio group (ensures permission to capture/play audio)
 sudo usermod -aG audio $USER
 newgrp audio
 ```
@@ -154,7 +152,7 @@ On Jetson Linux, the default systemd unit created by Ollama's installer can fail
 # 1. Install Ollama binary
 curl -fsSL https://ollama.com/install.sh | sh
 
-# 2. Configure Ollama service with Jetson permissions & network binding
+# 2. Configure Ollama service with Jetson root permissions & network binding
 sudo bash -c 'cat << "EOF" > /etc/systemd/system/ollama.service
 [Unit]
 Description=Ollama Service
@@ -317,7 +315,7 @@ def resolve_mic_device():
 # Automatically configure microphone
 MIC_DEV = resolve_mic_device()
 
-# Initialize Faster-Whisper on CPU (INT8) to avoid CUDA conflicts and preserve GPU memory
+# Initialize Faster-Whisper on CPU (INT8) to preserve GPU memory for Ollama
 whisper = WhisperModel("base.en", device="cpu", compute_type="int8")
 print("Offline voice assistant ready. Say 'Hey Joy' to start talking, or 'stop' to quit.", flush=True)
 
