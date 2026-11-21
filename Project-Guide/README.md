@@ -1,6 +1,6 @@
-# Offline AI Voice Assistant on NVIDIA Jetson Orin Nano
+# Offline AI Voice Assistant on NVIDIA Jetson Orin Nano (Super)
 
-A fully local, low-latency, and privacy-preserving voice assistant running entirely on-device without cloud services or external API calls. Built for embedded edge hardware like the NVIDIA Jetson Orin Nano (8GB), this project creates an interactive conversational loop featuring wake-word detection, multi-turn follow-up dialogue, local Large Language Model (LLM) inference, and neural text-to-speech synthesis.
+A fully local, low-latency, and privacy-preserving voice assistant running entirely on-device without cloud services or external API calls. Built for embedded edge hardware like the NVIDIA Jetson Orin Nano (8GB) with Super power mode support, this project creates an interactive conversational loop featuring wake-word detection, multi-turn follow-up dialogue, local Large Language Model (LLM) inference, and neural text-to-speech synthesis.
 
 ## Table of Contents
 
@@ -8,14 +8,16 @@ A fully local, low-latency, and privacy-preserving voice assistant running entir
 * [Key Features](#key-features)
 * [System Architecture](#system-architecture)
 * [Hardware Requirements](#hardware-requirements)
+* [Power Profiles & Performance Optimization](#power-profiles--performance-optimization)
 * [Software Requirements](#software-requirements)
 * [Step-by-Step Build Guide](#step-by-step-build-guide)
-  * [1. Audio Dependencies & User Permissions](#1-audio-dependencies--user-permissions)
-  * [2. Local LLM Runtime (Ollama Setup, Service Override & Validation)](#2-local-llm-runtime-ollama-setup-service-override--validation)
-  * [3. Python Environment & Faster-Whisper Setup](#3-python-environment--faster-whisper-setup)
-  * [4. Piper Neural TTS Setup & Voice Models](#4-piper-neural-tts-setup--voice-models)
-  * [5. Audio Hardware Verification](#5-audio-hardware-verification)
-  * [6. Create the Assistant Script (assistant.py)](#6-create-the-assistant-script-assistantpy)
+  * [1. Power Profile Configuration & Clocks](#1-power-profile-configuration--clocks)
+  * [2. Audio Dependencies & User Permissions](#2-audio-dependencies--user-permissions)
+  * [3. Local LLM Runtime (Ollama Setup, Service Override & Validation)](#3-local-llm-runtime-ollama-setup-service-override--validation)
+  * [4. Python Environment & Faster-Whisper Setup](#4-python-environment--faster-whisper-setup)
+  * [5. Piper Neural TTS Setup & Voice Models](#5-piper-neural-tts-setup--voice-models)
+  * [6. Audio Hardware Verification](#6-audio-hardware-verification)
+  * [7. Create the Assistant Script (assistant.py)](#7-create-the-assistant-script-assistantpy)
 * [Running the Assistant](#running-the-assistant)
 * [Microphone Auto-Detection & Custom Override](#microphone-auto-detection--custom-override)
 * [Thermal & Power Telemetry](#thermal--power-telemetry)
@@ -46,13 +48,13 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
   * *Active Follow-Up Window:* Opens a 10-second command capture window and retains active conversational state so you can ask multi-turn questions without repeating the wake word.
   * *Auto-Sleep:* Automatically returns to passive standby after 3 consecutive silent or ambient-noise turns.
 * **Universal Audio Hardware Auto-Detection:** Dynamically scans active ALSA cards on startup to prioritize connected USB microphones, webcams (e.g., Logitech C270), or headsets without manual card indexing.
-* **Stable Thermal & Power Budget:** Runs reliably within the Jetson 25W power profile at approximately ~50°C under load.
+* **Stable Thermal & Power Budget:** Runs reliably within the Jetson power envelope at approximately ~50°C under load.
 
 ---
 
 ## System Architecture
 
-```text
+```
        +-----------------------+
        |   Ambient Listening   | <---+
        |    (3-second loop)    |     |
@@ -96,7 +98,7 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 ## Hardware Requirements
 
 | Component | Recommendation / Tested Spec |
-| :--- | :--- |
+| --- | --- |
 | **SBC** | NVIDIA Jetson Orin Nano Developer Kit (8GB) |
 | **Storage** | 128GB+ NVMe PCIe M.2 SSD |
 | **Power Supply** | Standard Jetson 19V DC power barrel adapter |
@@ -104,7 +106,27 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 | **Speaker** | 3.5mm AUX Speaker, USB Audio Out, or Monitor Audio via DisplayPort |
 | **Cooling** | Active PWM cooling fan |
 
-> **Note on Power Modes:** Prior to heavy testing or recording, switch your Jetson power profile to **MAXN / 25W** directly via the desktop GUI power mode drop-down menu in the top-right toolbar.
+---
+
+## Power Profiles & Performance Optimization
+
+Jetson Orin Nano configurations with Super mode enabled provide three distinct power profiles:
+
+* **`0: 15W`** – Standard baseline mode. Safe, low-power operation.
+* **`1: 25W` (Recommended)** – Unlocks higher CPU/GPU frequency thresholds for faster STT transcription and LLM token generation without tripping hardware alerts.
+* **`2: MAXN SUPER`** – Uncapped maximum performance profile.
+
+### Notice Regarding Over-Current Warnings in MAXN SUPER
+
+When running heavy, concurrent AI workloads (transcribing with Faster-Whisper on CPU while generating tokens with Ollama on GPU) under **`2: MAXN SUPER`**, you may occasionally see a desktop warning notification:
+```
+System throttled due to over-current
+```
+*(or `System performance degraded`)*
+
+This is a built-in Tegra PMIC hardware safety mechanism that momentarily throttles clock frequencies to prevent instantaneous voltage drops or current spikes on the power rail. 
+- You can **safely ignore** these transient popups.
+- Alternatively, you can switch to **`1: 25W` mode**, which provides fast inference speeds while running completely alert-free.
 
 ---
 
@@ -122,12 +144,31 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 
 ## Step-by-Step Build Guide
 
-### 1. Audio Dependencies & User Permissions
+### 1. Power Profile Configuration & Clocks
 
-Install the necessary audio libraries and developer packages, then add your user to the `audio` group for direct ALSA device access:
+Check your active power profile and switch to the recommended **25W** mode (`-m 1`):
 
 ```bash
-# 1. Update package index and install required audio/system tools
+# 1. Query current active power profile
+sudo nvpmodel -q
+
+# 2. Switch to 25W mode (Mode 1 on Jetson Orin Nano Super)
+sudo nvpmodel -m 1
+
+# 3. (Optional) Lock clocks to maximum frequencies for optimal latency
+sudo jetson_clocks
+```
+
+> **Tip:** You can also select **1: 25W** directly from the top-right desktop GUI toolbar power menu.
+
+---
+
+### 2. Audio Dependencies & User Permissions
+
+Install the required audio utilities and development packages, then add your user account to the `audio` group:
+
+```bash
+# 1. Update package lists and install required tools
 sudo apt update && sudo apt install -y \
     alsa-utils \
     sox \
@@ -137,22 +178,22 @@ sudo apt update && sudo apt install -y \
     python3-pip \
     python3-venv
 
-# 2. Add your user to the audio group (ensures permission to capture/play audio)
-sudo usermod -aG audio $USER
+# 2. Add current user to the audio group and refresh permissions
+sudo usermod -aG audio "$USER"
 newgrp audio
 ```
 
 ---
 
-### 2. Local LLM Runtime (Ollama Setup, Service Override & Validation)
+### 3. Local LLM Runtime (Ollama Setup, Service Override & Validation)
 
-On Jetson Linux, the default systemd unit created by Ollama's installer can fail to access the Tegra driver interfaces under the unprivileged `ollama` user. We install Ollama, apply the systemd unit override with root privileges and explicit host binding, and verify the HTTP endpoint before pulling the model:
+On Jetson devices, configuring Ollama's systemd service with explicit root privileges and binding to `0.0.0.0:11434` prevents common socket connection failures:
 
 ```bash
-# 1. Install Ollama binary
+# 1. Download and install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 
-# 2. Configure Ollama service with Jetson root permissions & network binding
+# 2. Configure systemd unit override
 sudo bash -c 'cat << "EOF" > /etc/systemd/system/ollama.service
 [Unit]
 Description=Ollama Service
@@ -171,83 +212,83 @@ Environment="OLLAMA_HOST=0.0.0.0:11434"
 WantedBy=default.target
 EOF'
 
-# 3. Reload systemd and start the service
+# 3. Reload systemd daemon and start Ollama
 sudo systemctl daemon-reload
 sudo systemctl enable --now ollama
 sleep 3
 
-# 4. Verify local server connection (returns {"models":[]})
+# 4. Verify local HTTP endpoint is listening (returns {"models":[]})
 curl -s http://127.0.0.1:11434/api/tags
 
-# 5. Pull and test the lightweight 3B model
+# 5. Pull and test the 3B model
 ollama run llama3.2:3b "Hello!"
 ```
 
 ---
 
-### 3. Python Environment & Faster-Whisper Setup
+### 4. Python Environment & Faster-Whisper Setup
 
-Create an isolated directory and install `faster-whisper`, `requests`, and pin `av<19` to prevent the PyAV `metadata_errors` incompatibility:
+Create an isolated directory and install dependencies. Pinned `av<19` prevents PyAV version 19 incompatibility crashes with `faster-whisper`:
 
 ```bash
 # 1. Create workspace directory
 mkdir -p ~/voice-bot/voices
 cd ~/voice-bot
 
-# 2. Set up Python virtual environment
+# 2. Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# 3. Install required Python packages (with av<19 pinned)
+# 3. Install Python libraries with PyAV pinned below version 19
 pip install --upgrade pip
-pip install faster-whisper requests "av<19"
+pip install faster-whisper requests "av<19>"
 ```
 
 ---
 
-### 4. Piper Neural TTS Setup & Voice Models
+### 5. Piper Neural TTS Setup & Voice Models
 
-Download the pre-compiled ARM64 Piper TTS binary and the Lessac Medium ONNX voice model:
+Download the pre-compiled ARM64 Piper executable and the Lessac Medium ONNX voice model:
 
 ```bash
 cd ~/voice-bot
 
-# 1. Download and extract Piper for Linux aarch64
+# 1. Download and extract Piper for ARM64 (aarch64)
 wget https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_aarch64.tar.gz
 tar -xf piper_linux_aarch64.tar.gz
 
-# 2. Make executable and symlink globally
+# 2. Set execution permissions and symlink globally
 chmod +x ~/voice-bot/piper/piper
 sudo ln -sf ~/voice-bot/piper/piper /usr/local/bin/piper
 
-# 3. Download voice model and JSON config
+# 3. Download ONNX voice model and config
 cd ~/voice-bot/voices
 wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx
 wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json
 
-# Return to workspace root
+# Return to root workspace
 cd ~/voice-bot
 ```
 
 ---
 
-### 5. Audio Hardware Verification
+### 6. Audio Hardware Verification
 
-Verify audio capture and playback before running the script:
+Verify audio playback and hardware recognition before running the main assistant:
 
 ```bash
-# 1. Test speaker playback (plays a short 880Hz test tone)
+# 1. Test playback through speaker (plays an 880Hz test tone)
 play -nq -n synth 0.2 sin 880 vol 0.2
 
-# 2. Check detected ALSA capture cards
+# 2. Inspect available ALSA capture cards
 arecord -l
 ```
 
 ---
 
-### 6. Create the Assistant Script (assistant.py)
+### 7. Create the Assistant Script (assistant.py)
 
-Generate the complete voice assistant script into `~/voice-bot/assistant.py`:
+Write the complete conversational assistant code to `~/voice-bot/assistant.py`:
 
 ```bash
 cat << 'EOF' > ~/voice-bot/assistant.py
@@ -430,7 +471,7 @@ EOF
 
 ## Running the Assistant
 
-Activate the environment and start the assistant:
+Activate your Python virtual environment and run the assistant:
 
 ```bash
 cd ~/voice-bot
@@ -438,12 +479,12 @@ source venv/bin/activate
 python3 assistant.py
 ```
 
-> **Note on First Run:** During the initial execution, `faster-whisper` will automatically download the `base.en` model weights (~140MB) into `~/.cache/huggingface/`. Subsequent runs load instantly from disk.
+> **First Run Model Cache:** On the very first launch, `faster-whisper` downloads the `base.en` model weights (~140MB) to `~/.cache/huggingface/`. Subsequent starts load instantly from local disk.
 
-### Conversational Lifecycle
+### Conversational Flow
 
 1. **Wake Trigger:** Say **"Hey Joy"**.
-2. **Audio Cue:** The device sounds a single short beep (880 Hz).
+2. **Audio Confirmation:** The speaker emits an 880 Hz confirmation beep.
 3. **Command Capture:** Speak your command or question during the 10-second capture window.
 4. **Spoken Response:** The assistant synthesizes a short response and reads it aloud through your speaker.
 5. **Continuous Conversation:** Ask follow-up questions directly without repeating `"Hey Joy"`.
@@ -453,7 +494,7 @@ python3 assistant.py
 
 ## Microphone Auto-Detection & Custom Override
 
-The script dynamically detects USB microphones and webcams upon launch. If you have multiple microphones connected and want to force a specific ALSA hardware card:
+The script dynamically detects USB microphones and webcams upon launch. If you have multiple capture devices connected and want to bind directly to a specific ALSA hardware card:
 
 1. List available capture cards:
    ```bash
@@ -463,44 +504,3 @@ The script dynamically detects USB microphones and webcams upon launch. If you h
    ```bash
    # Example: forcing Card 1, Device 0
    MIC_DEV=plughw:1,0 python3 assistant.py
-   ```
-
----
-
-## Thermal & Power Telemetry
-
-Monitor hardware statistics in real time using the Jetson diagnostic utility:
-
-```bash
-timeout 5 tegrastats
-```
-
-**Typical Profile Under 25W Operation:**
-* **VDD_IN (System Power):** 4.9W – 5.5W during standby monitoring; brief peaks up to 10W–14W during active LLM inference.
-* **Temperatures:** CPU, GPU, and SoC rails remain balanced between 48°C and 52°C.
-* **RAM Utilization:** Approximately 6.1 GB – 6.3 GB used (comfortably within the 7.48 GB available).
-
----
-
-## Troubleshooting
-
-* **Ollama Connection Refused (`11434`):** Ensure the background service is loaded:
-  ```bash
-  sudo systemctl daemon-reload && sudo systemctl restart ollama
-  ```
-* **PyAV `metadata_errors` error:** Ensure `av<19` is installed in your virtual environment:
-  ```bash
-  pip install "av<19"
-  ```
-* **Wake word not detected:** Ensure microphone volume is adequate. Launch `alsamixer`, press `F6` to select your USB sound card, press `F4` to view capture levels, and raise the input gain.
-* **No audio playback:** Test playback manually with `play /tmp/reply.wav` or check speaker routing in `alsamixer` under playback devices (`F3`).
-* **Piper command not found:** Ensure the symlink was created correctly:
-  ```bash
-  sudo ln -sf ~/voice-bot/piper/piper /usr/local/bin/piper
-  ```
-
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
