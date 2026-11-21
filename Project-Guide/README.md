@@ -1,4 +1,4 @@
-# Offline Voice Assistant on NVIDIA Jetson Orin Nano
+# Offline AI Voice Assistant on NVIDIA Jetson Orin Nano
 
 A fully local, low-latency, and privacy-preserving voice assistant running entirely on-device without cloud services or external API calls. Built for embedded edge hardware like the NVIDIA Jetson Orin Nano (8GB), this project creates an interactive conversational loop featuring wake-word detection, multi-turn follow-up dialogue, local Large Language Model (LLM) inference, and neural text-to-speech synthesis.
 
@@ -9,13 +9,13 @@ A fully local, low-latency, and privacy-preserving voice assistant running entir
 * [System Architecture](#system-architecture)
 * [Hardware Requirements](#hardware-requirements)
 * [Software Requirements](#software-requirements)
-* [Tutorial Guides & Videos](#tutorial-guides--videos)
 * [Step-by-Step Build Guide](#step-by-step-build-guide)
   * [1. System Performance, Audio Dependencies & Permissions](#1-system-performance-audio-dependencies--permissions)
-  * [2. Local LLM Runtime (Ollama)](#2-local-llm-runtime-ollama)
-  * [3. Python Environment & Piper TTS Setup](#3-python-environment--piper-tts-setup)
-  * [4. Audio Hardware Verification](#4-audio-hardware-verification)
-  * [5. Create the Assistant Script (assistant.py)](#5-create-the-assistant-script-assistantpy)
+  * [2. Local LLM Runtime (Ollama Setup & Validation)](#2-local-llm-runtime-ollama-setup--validation)
+  * [3. Python Environment & Faster-Whisper Setup](#3-python-environment--faster-whisper-setup)
+  * [4. Piper Neural TTS Setup & Voice Models](#4-piper-neural-tts-setup--voice-models)
+  * [5. Audio Hardware Verification](#5-audio-hardware-verification)
+  * [6. Create the Assistant Script (assistant.py)](#6-create-the-assistant-script-assistantpy)
 * [Running the Assistant](#running-the-assistant)
 * [Microphone Auto-Detection & Custom Override](#microphone-auto-detection--custom-override)
 * [Thermal & Power Telemetry](#thermal--power-telemetry)
@@ -32,7 +32,7 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 
 * **LLM Engine:** Local GPU-accelerated inference (`llama3.2:3b` hosted via Ollama) with a memory keep-alive pool.
 * **Speech-to-Text (STT):** Quantized CPU-side transcription (`faster-whisper` on `base.en`, INT8) that avoids CUDA library conflicts and keeps GPU memory open for the language model.
-* **Text-to-Speech (TTS):** Low-overhead, real-time neural speech synthesis using Piper TTS.
+* **Text-to-Speech (TTS):** Low-overhead, real-time neural speech synthesis using Piper TTS (ARM64 native binary).
 * **Audio Layer:** Direct ALSA subsystem integration featuring dynamic capture device auto-detection and fallback overrides.
 
 ---
@@ -108,21 +108,13 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 
 ## Software Requirements
 
-* **Operating System:** Ubuntu 22.04 LTS (JetPack 6.x)
+* **Operating System:** Ubuntu 22.04 LTS (JetPack 5.x / 6.x)
 * **Python Runtime:** Python 3.10+
 * **System Utilities:** `alsa-utils`, `sox`, `libsox-fmt-all`, `curl`, `git`
 * **Local Inference Engines:**
   * Ollama (`llama3.2:3b`)
   * `faster-whisper`
   * Piper TTS (`en_US-lessac-medium`)
-
----
-
-## Tutorial Guides & Videos
-
-* **Official NVIDIA Getting Started Guide:** [NVIDIA Jetson Orin Nano DevKit Documentation](https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit)
-* **Jetson Orin Nano Setup & Unboxing:** `[INSERT_YOUTUBE_VIDEO_LINK_HERE]`
-* **Complete Step-by-Step Project Walkthrough:** `[INSERT_VOICE_ASSISTANT_VIDEO_LINK_HERE]`
 
 ---
 
@@ -154,26 +146,34 @@ newgrp audio
 
 ---
 
-### 2. Local LLM Runtime (Ollama)
+### 2. Local LLM Runtime (Ollama Setup & Validation)
 
-Install Ollama to run the conversational model locally on the Jetson:
+Install Ollama, ensure the systemd service is active and bound to port `11434`, and download the model:
 
 ```bash
-# 1. Install Ollama binary & system service
+# 1. Install Ollama binary & systemd service
 curl -fsSL https://ollama.com/install.sh | sh
 
-# 2. Pull and test the lightweight 3B model (runs locally on GPU/CPU)
+# 2. Ensure daemon is active and listening
+sudo systemctl daemon-reload
+sudo systemctl enable --now ollama
+
+# 3. Wait for socket to bind and verify endpoint responsiveness
+sleep 3
+curl -s http://127.0.0.1:11434/api/tags
+
+# 4. Pull and test the lightweight 3B model
 ollama run llama3.2:3b "Hello!"
 ```
 
 ---
 
-### 3. Python Environment & Piper TTS Setup
+### 3. Python Environment & Faster-Whisper Setup
 
-Create a dedicated workspace, configure a virtual environment, and download the pre-compiled ARM64 Piper TTS binary and voice model:
+Create an isolated directory and install `faster-whisper` and HTTP request libraries:
 
 ```bash
-# 1. Create directory structure
+# 1. Create workspace directory
 mkdir -p ~/voice-bot/voices
 cd ~/voice-bot
 
@@ -181,44 +181,56 @@ cd ~/voice-bot
 python3 -m venv venv
 source venv/bin/activate
 
-# 3. Install required Python dependencies
+# 3. Install required Python packages
 pip install --upgrade pip
 pip install faster-whisper requests
+```
 
-# 4. Download and install Piper TTS (ARM64 release)
+---
+
+### 4. Piper Neural TTS Setup & Voice Models
+
+Download the pre-compiled ARM64 Piper TTS binary and the Lessac Medium ONNX voice model:
+
+```bash
+cd ~/voice-bot
+
+# 1. Download and extract Piper for Linux aarch64
 wget https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_aarch64.tar.gz
 tar -xf piper_linux_aarch64.tar.gz
+
+# 2. Make executable and symlink globally
 chmod +x ~/voice-bot/piper/piper
 sudo ln -sf ~/voice-bot/piper/piper /usr/local/bin/piper
 
-# 5. Download Piper voice model (Lessac Medium) and JSON config
+# 3. Download voice model and JSON config
 cd ~/voice-bot/voices
 wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx
 wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json
 
-# Return to base directory
+# Return to workspace root
 cd ~/voice-bot
 ```
 
 ---
 
-### 4. Audio Hardware Verification
+### 5. Audio Hardware Verification
 
-Before creating the main script, verify your speaker and microphone channels:
+Verify audio capture and playback before running the script:
 
 ```bash
-# 1. Verify playback (plays a short 880Hz test beep)
+# 1. Test speaker playback (plays a short 880Hz test tone)
 play -nq -n synth 0.2 sin 880 vol 0.2
 
-# 2. Check capture devices recognized by ALSA
+# 2. Check detected ALSA capture cards
 arecord -l
 ```
 
 ---
 
-### 5. Create the Assistant Script (assistant.py)
+### 6. Create the Assistant Script (assistant.py)
 
-Generate the complete voice assistant script into `~/voice-bot/assistant.py` with a single terminal command:
+Generate the complete voice assistant script into `~/voice-bot/assistant.py` with a single command:
 
 ```bash
 cat << 'EOF' > ~/voice-bot/assistant.py
@@ -409,7 +421,7 @@ source venv/bin/activate
 python3 assistant.py
 ```
 
-> **Note on First Run:** During the initial run, `faster-whisper` will automatically download the `base.en` model weights (~140MB) into `~/.cache/huggingface/`. Subsequent runs will load instantly from disk.
+> **Note on First Run:** During the initial execution, `faster-whisper` will automatically download the `base.en` model weights (~140MB) into `~/.cache/huggingface/`. Subsequent runs load instantly from disk.
 
 ### Conversational Lifecycle
 
@@ -447,6 +459,7 @@ timeout 5 tegrastats
 ```
 
 **Typical Profile Under 25W Operation:**
+
 * **VDD_IN (System Power):** 4.9W – 5.5W during standby monitoring; brief peaks up to 10W–14W during active LLM inference.
 * **Temperatures:** CPU, GPU, and SoC rails remain balanced between 48°C and 52°C.
 * **RAM Utilization:** Approximately 6.1 GB – 6.3 GB used (comfortably within the 7.48 GB available).
@@ -455,6 +468,10 @@ timeout 5 tegrastats
 
 ## Troubleshooting
 
+* **Ollama Connection Refused (`11434`):** Ensure the background service is loaded:
+  ```bash
+  sudo systemctl daemon-reload && sudo systemctl restart ollama
+  ```
 * **Wake word not detected:** Ensure microphone volume is adequate. Launch `alsamixer`, press `F6` to select your USB sound card, press `F4` to view capture levels, and raise the input gain.
 * **No audio playback:** Test playback manually with `play /tmp/reply.wav` or check speaker routing in `alsamixer` under playback devices (`F3`).
 * **Piper command not found:** Ensure the symlink was created correctly:
