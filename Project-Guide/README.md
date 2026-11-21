@@ -22,6 +22,8 @@ A fully local, low-latency, and privacy-preserving voice assistant running entir
 * [Troubleshooting](#troubleshooting)
 * [License](#license)
 
+---
+
 ## Project Overview
 
 Running voice assistants on edge hardware typically encounters three hurdles: memory saturation, thermal throttling, and hardware-specific compilation conflicts (such as cuDNN/CTranslate2 compatibility quirks on JetPack).
@@ -33,6 +35,8 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 * **Text-to-Speech (TTS):** Low-overhead, real-time neural speech synthesis using Piper TTS (ARM64 native binary).
 * **Audio Layer:** Direct ALSA subsystem integration featuring dynamic capture device auto-detection and fallback overrides.
 
+---
+
 ## Key Features
 
 * **100% Offline & Private:** Zero cloud telemetry, no internet dependency once installed, and no subscription fees or API tokens.
@@ -43,6 +47,8 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
   * *Auto-Sleep:* Automatically returns to passive standby after 3 consecutive silent or ambient-noise turns.
 * **Universal Audio Hardware Auto-Detection:** Dynamically scans active ALSA cards on startup to prioritize connected USB microphones, webcams (e.g., Logitech C270), or headsets without manual card indexing.
 * **Stable Thermal & Power Budget:** Runs reliably within the Jetson 25W power profile at approximately ~50°C under load.
+
+---
 
 ## System Architecture
 
@@ -85,6 +91,8 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
        +-----------------------+
 ```
 
+---
+
 ## Hardware Requirements
 
 | Component | Recommendation / Tested Spec |
@@ -96,6 +104,8 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 | **Speaker** | 3.5mm AUX Speaker, USB Audio Out, or Monitor Audio via DisplayPort |
 | **Cooling** | Active PWM cooling fan |
 
+---
+
 ## Software Requirements
 
 * **Operating System:** Ubuntu 22.04 LTS (JetPack 5.x / 6.x)
@@ -105,6 +115,8 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
   * Ollama (`llama3.2:3b`)
   * `faster-whisper`
   * Piper TTS (`en_US-lessac-medium`)
+
+---
 
 ## Step-by-Step Build Guide
 
@@ -132,15 +144,17 @@ sudo usermod -aG audio $USER
 newgrp audio
 ```
 
+---
+
 ### 2. Local LLM Runtime (Ollama Setup, Service Override & Validation)
 
-On Jetson Linux, the default systemd unit created by Ollama's installer can fail to access the Tegra driver interfaces under the unprivileged `ollama` user, or fail to bind immediately. We install Ollama, apply the verified service configuration to guarantee proper GPU and socket access, and verify port `11434` before pulling the model:
+On Jetson Linux, the default systemd unit created by Ollama's installer can fail to access the Tegra driver interfaces under the unprivileged `ollama` user. We install Ollama, apply the systemd unit override with root privileges and explicit host binding, and verify the HTTP endpoint before pulling the model:
 
 ```bash
 # 1. Install Ollama binary
 curl -fsSL https://ollama.com/install.sh | sh
 
-# 2. Configure Ollama service with Jetson root permissions & network binding
+# 2. Configure Ollama service with Jetson permissions & network binding
 sudo bash -c 'cat << "EOF" > /etc/systemd/system/ollama.service
 [Unit]
 Description=Ollama Service
@@ -164,16 +178,18 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now ollama
 sleep 3
 
-# 4. Verify local server connection (should return {"models":[]})
+# 4. Verify local server connection (returns {"models":[]})
 curl -s http://127.0.0.1:11434/api/tags
 
 # 5. Pull and test the lightweight 3B model
 ollama run llama3.2:3b "Hello!"
 ```
 
+---
+
 ### 3. Python Environment & Faster-Whisper Setup
 
-Create an isolated directory and install `faster-whisper` and HTTP request libraries:
+Create an isolated directory and install `faster-whisper`, `requests`, and pin `av<19` to prevent the PyAV `metadata_errors` incompatibility:
 
 ```bash
 # 1. Create workspace directory
@@ -184,10 +200,12 @@ cd ~/voice-bot
 python3 -m venv venv
 source venv/bin/activate
 
-# 3. Install required Python packages
+# 3. Install required Python packages (with av<19 pinned)
 pip install --upgrade pip
-pip install faster-whisper requests
+pip install faster-whisper requests "av<19"
 ```
+
+---
 
 ### 4. Piper Neural TTS Setup & Voice Models
 
@@ -213,6 +231,8 @@ wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/me
 cd ~/voice-bot
 ```
 
+---
+
 ### 5. Audio Hardware Verification
 
 Verify audio capture and playback before running the script:
@@ -225,9 +245,11 @@ play -nq -n synth 0.2 sin 880 vol 0.2
 arecord -l
 ```
 
+---
+
 ### 6. Create the Assistant Script (assistant.py)
 
-Generate the complete voice assistant script into `~/voice-bot/assistant.py` with a single command:
+Generate the complete voice assistant script into `~/voice-bot/assistant.py`:
 
 ```bash
 cat << 'EOF' > ~/voice-bot/assistant.py
@@ -406,6 +428,8 @@ except KeyboardInterrupt:
 EOF
 ```
 
+---
+
 ## Running the Assistant
 
 Activate the environment and start the assistant:
@@ -427,6 +451,8 @@ python3 assistant.py
 5. **Continuous Conversation:** Ask follow-up questions directly without repeating `"Hey Joy"`.
 6. **Sleep Mode:** Say **"Goodbye"** or remain silent for 3 consecutive capture turns (~30 seconds) to return to passive standby.
 
+---
+
 ## Microphone Auto-Detection & Custom Override
 
 The script dynamically detects USB microphones and webcams upon launch. If you have multiple microphones connected and want to force a specific ALSA hardware card:
@@ -441,6 +467,8 @@ The script dynamically detects USB microphones and webcams upon launch. If you h
    MIC_DEV=plughw:1,0 python3 assistant.py
    ```
 
+---
+
 ## Thermal & Power Telemetry
 
 Monitor hardware statistics in real time using the Jetson diagnostic utility:
@@ -454,11 +482,17 @@ timeout 5 tegrastats
 * **Temperatures:** CPU, GPU, and SoC rails remain balanced between 48°C and 52°C.
 * **RAM Utilization:** Approximately 6.1 GB – 6.3 GB used (comfortably within the 7.48 GB available).
 
+---
+
 ## Troubleshooting
 
 * **Ollama Connection Refused (`11434`):** Ensure the background service is loaded:
   ```bash
   sudo systemctl daemon-reload && sudo systemctl restart ollama
+  ```
+* **PyAV `metadata_errors` error:** Ensure `av<19` is installed in your virtual environment:
+  ```bash
+  pip install "av<19"
   ```
 * **Wake word not detected:** Ensure microphone volume is adequate. Launch `alsamixer`, press `F6` to select your USB sound card, press `F4` to view capture levels, and raise the input gain.
 * **No audio playback:** Test playback manually with `play /tmp/reply.wav` or check speaker routing in `alsamixer` under playback devices (`F3`).
@@ -466,6 +500,8 @@ timeout 5 tegrastats
   ```bash
   sudo ln -sf ~/voice-bot/piper/piper /usr/local/bin/piper
   ```
+
+---
 
 ## License
 
