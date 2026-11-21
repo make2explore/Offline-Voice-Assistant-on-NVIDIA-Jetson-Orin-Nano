@@ -11,7 +11,7 @@ A fully local, low-latency, and privacy-preserving voice assistant running entir
 * [Software Requirements](#software-requirements)
 * [Step-by-Step Build Guide](#step-by-step-build-guide)
   * [1. System Performance, Audio Dependencies & Permissions](#1-system-performance-audio-dependencies--permissions)
-  * [2. Local LLM Runtime (Ollama Setup & Validation)](#2-local-llm-runtime-ollama-setup--validation)
+  * [2. Local LLM Runtime (Ollama Setup, Service Override & Validation)](#2-local-llm-runtime-ollama-setup-service-override--validation)
   * [3. Python Environment & Faster-Whisper Setup](#3-python-environment--faster-whisper-setup)
   * [4. Piper Neural TTS Setup & Voice Models](#4-piper-neural-tts-setup--voice-models)
   * [5. Audio Hardware Verification](#5-audio-hardware-verification)
@@ -21,8 +21,6 @@ A fully local, low-latency, and privacy-preserving voice assistant running entir
 * [Thermal & Power Telemetry](#thermal--power-telemetry)
 * [Troubleshooting](#troubleshooting)
 * [License](#license)
-
----
 
 ## Project Overview
 
@@ -35,8 +33,6 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 * **Text-to-Speech (TTS):** Low-overhead, real-time neural speech synthesis using Piper TTS (ARM64 native binary).
 * **Audio Layer:** Direct ALSA subsystem integration featuring dynamic capture device auto-detection and fallback overrides.
 
----
-
 ## Key Features
 
 * **100% Offline & Private:** Zero cloud telemetry, no internet dependency once installed, and no subscription fees or API tokens.
@@ -48,11 +44,9 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 * **Universal Audio Hardware Auto-Detection:** Dynamically scans active ALSA cards on startup to prioritize connected USB microphones, webcams (e.g., Logitech C270), or headsets without manual card indexing.
 * **Stable Thermal & Power Budget:** Runs reliably within the Jetson 25W power profile at approximately ~50°C under load.
 
----
-
 ## System Architecture
 
-```text
+```
        +-----------------------+
        |   Ambient Listening   | <---+
        |    (3-second loop)    |     |
@@ -91,8 +85,6 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
        +-----------------------+
 ```
 
----
-
 ## Hardware Requirements
 
 | Component | Recommendation / Tested Spec |
@@ -104,8 +96,6 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
 | **Speaker** | 3.5mm AUX Speaker, USB Audio Out, or Monitor Audio via DisplayPort |
 | **Cooling** | Active PWM cooling fan |
 
----
-
 ## Software Requirements
 
 * **Operating System:** Ubuntu 22.04 LTS (JetPack 5.x / 6.x)
@@ -115,8 +105,6 @@ This project resolves those constraints on the **NVIDIA Jetson Orin Nano (8GB)**
   * Ollama (`llama3.2:3b`)
   * `faster-whisper`
   * Piper TTS (`en_US-lessac-medium`)
-
----
 
 ## Step-by-Step Build Guide
 
@@ -144,29 +132,44 @@ sudo usermod -aG audio $USER
 newgrp audio
 ```
 
----
+### 2. Local LLM Runtime (Ollama Setup, Service Override & Validation)
 
-### 2. Local LLM Runtime (Ollama Setup & Validation)
-
-Install Ollama, ensure the systemd service is active and bound to port `11434`, and download the model:
+On Jetson Linux, the default systemd unit created by Ollama's installer can fail to access the Tegra driver interfaces under the unprivileged `ollama` user, or fail to bind immediately. We install Ollama, apply the verified service configuration to guarantee proper GPU and socket access, and verify port `11434` before pulling the model:
 
 ```bash
-# 1. Install Ollama binary & systemd service
+# 1. Install Ollama binary
 curl -fsSL https://ollama.com/install.sh | sh
 
-# 2. Ensure daemon is active and listening
+# 2. Configure Ollama service with Jetson root permissions & network binding
+sudo bash -c 'cat << "EOF" > /etc/systemd/system/ollama.service
+[Unit]
+Description=Ollama Service
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/ollama serve
+User=root
+Group=root
+Restart=always
+RestartSec=3
+Environment="PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="OLLAMA_HOST=0.0.0.0:11434"
+
+[Install]
+WantedBy=default.target
+EOF'
+
+# 3. Reload systemd and start the service
 sudo systemctl daemon-reload
 sudo systemctl enable --now ollama
-
-# 3. Wait for socket to bind and verify endpoint responsiveness
 sleep 3
+
+# 4. Verify local server connection (should return {"models":[]})
 curl -s http://127.0.0.1:11434/api/tags
 
-# 4. Pull and test the lightweight 3B model
+# 5. Pull and test the lightweight 3B model
 ollama run llama3.2:3b "Hello!"
 ```
-
----
 
 ### 3. Python Environment & Faster-Whisper Setup
 
@@ -185,8 +188,6 @@ source venv/bin/activate
 pip install --upgrade pip
 pip install faster-whisper requests
 ```
-
----
 
 ### 4. Piper Neural TTS Setup & Voice Models
 
@@ -212,8 +213,6 @@ wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/me
 cd ~/voice-bot
 ```
 
----
-
 ### 5. Audio Hardware Verification
 
 Verify audio capture and playback before running the script:
@@ -225,8 +224,6 @@ play -nq -n synth 0.2 sin 880 vol 0.2
 # 2. Check detected ALSA capture cards
 arecord -l
 ```
-
----
 
 ### 6. Create the Assistant Script (assistant.py)
 
@@ -409,8 +406,6 @@ except KeyboardInterrupt:
 EOF
 ```
 
----
-
 ## Running the Assistant
 
 Activate the environment and start the assistant:
@@ -432,8 +427,6 @@ python3 assistant.py
 5. **Continuous Conversation:** Ask follow-up questions directly without repeating `"Hey Joy"`.
 6. **Sleep Mode:** Say **"Goodbye"** or remain silent for 3 consecutive capture turns (~30 seconds) to return to passive standby.
 
----
-
 ## Microphone Auto-Detection & Custom Override
 
 The script dynamically detects USB microphones and webcams upon launch. If you have multiple microphones connected and want to force a specific ALSA hardware card:
@@ -448,8 +441,6 @@ The script dynamically detects USB microphones and webcams upon launch. If you h
    MIC_DEV=plughw:1,0 python3 assistant.py
    ```
 
----
-
 ## Thermal & Power Telemetry
 
 Monitor hardware statistics in real time using the Jetson diagnostic utility:
@@ -459,12 +450,9 @@ timeout 5 tegrastats
 ```
 
 **Typical Profile Under 25W Operation:**
-
 * **VDD_IN (System Power):** 4.9W – 5.5W during standby monitoring; brief peaks up to 10W–14W during active LLM inference.
 * **Temperatures:** CPU, GPU, and SoC rails remain balanced between 48°C and 52°C.
 * **RAM Utilization:** Approximately 6.1 GB – 6.3 GB used (comfortably within the 7.48 GB available).
-
----
 
 ## Troubleshooting
 
@@ -478,8 +466,6 @@ timeout 5 tegrastats
   ```bash
   sudo ln -sf ~/voice-bot/piper/piper /usr/local/bin/piper
   ```
-
----
 
 ## License
 
