@@ -1,6 +1,6 @@
 # Offline Voice Assistant on NVIDIA Jetson Orin Nano
 
-A fully local, low-latency, and privacy-preserving voice assistant running entirely on-device without cloud services or internet access. Designed specifically for embedded edge AI systems such as the NVIDIA Jetson Orin Nano, this project delivers an interactive conversational voice loop featuring wake-word activation, multi-turn follow-up dialogue, local Large Language Model (LLM) reasoning, and neural text-to-speech synthesis.  
+A fully local, low-latency, and privacy-preserving voice assistant running entirely on-device without cloud services or internet access. Designed specifically for embedded edge AI systems such as the NVIDIA Jetson Orin Nano, this **project delivers an interactive conversational voice loop** featuring wake-word activation, multi-turn follow-up dialogue, local Large Language Model (LLM) reasoning, and neural text-to-speech synthesis.  
   
 <img src="/Images/m2e-Offline-Voice-AI.jpg" height="200">  
 
