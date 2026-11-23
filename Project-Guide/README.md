@@ -241,7 +241,7 @@ source venv/bin/activate
 
 # 3. Install Python libraries with PyAV pinned below version 19
 pip install --upgrade pip
-pip install faster-whisper requests "av<19>"
+pip install faster-whisper requests "av<19"
 ```
 
 ---
