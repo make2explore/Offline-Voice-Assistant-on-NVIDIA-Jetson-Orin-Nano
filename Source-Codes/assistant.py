@@ -2,7 +2,7 @@
 # Project           - Offline Voice Assistant on NVIDIA Jetson Orin Nano
 # Created By        - info@make2explore.com
 # Last Modified     - 20/11/2026 14:36:00 @admin
-# Software          - Python
+# Software          - Programming Languages : Python
 # Hardware          - NVIDIA Jetson Orin Nano  
 # Sensors Used      - External USB Mic & Speakers 
 # Source Repo       - github.com/make2explore
